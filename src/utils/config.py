@@ -24,6 +24,11 @@ class Config:
     # SongFinder API credentials (optional)
     SONGFINDER_API_KEY: Optional[str] = os.getenv("SONGFINDER_API_KEY")
     
+    # AI API credentials (optional - for smart orchestration)
+    HUGGINGFACE_API_KEY: Optional[str] = os.getenv("HUGGINGFACE_API_KEY")
+    TOGETHER_API_KEY: Optional[str] = os.getenv("TOGETHER_API_KEY")
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    
     # Processing settings
     SEGMENT_LENGTH: int = int(os.getenv("SEGMENT_LENGTH", "45"))
     SEGMENT_OVERLAP: int = int(os.getenv("SEGMENT_OVERLAP", "15"))
