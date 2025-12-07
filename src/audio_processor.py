@@ -30,9 +30,26 @@ class AudioProcessor:
         return ext in self.SUPPORTED_FORMATS
     
     def get_duration(self, file_path: str) -> float:
-        """Get duration of audio file in seconds"""
+        """Get duration of audio file in seconds (memory efficient)"""
         try:
-            y, sr = librosa.load(file_path, sr=None, duration=0.1)
+            # Try FFprobe first (doesn't load file into memory)
+            import subprocess
+            cmd = [
+                'ffprobe',
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                file_path
+            ]
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+            if result.returncode == 0:
+                duration = float(result.stdout.decode().strip())
+                return duration
+        except:
+            pass
+        
+        # Fallback to librosa (only if FFprobe fails)
+        try:
             duration = librosa.get_duration(path=file_path)
             return duration
         except Exception as e:
@@ -98,44 +115,19 @@ class AudioProcessor:
             )
             
             if result.returncode != 0:
-                # Fallback to librosa if FFmpeg fails
-                y, sr = librosa.load(
-                    file_path,
-                    offset=start_time,
-                    duration=duration,
-                    sr=22050
-                )
-                sf.write(output_path, y, sr)
-            else:
-                # Verify file was created
-                if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-                    # Fallback to librosa
-                    y, sr = librosa.load(
-                        file_path,
-                        offset=start_time,
-                        duration=duration,
-                        sr=22050
-                    )
-                    sf.write(output_path, y, sr)
+                # FFmpeg failed - raise error instead of falling back to librosa (memory intensive)
+                error_msg = result.stderr.decode() if result.stderr else "FFmpeg failed"
+                raise ValueError(f"FFmpeg failed to extract segment: {error_msg}")
+            
+            # Verify file was created
+            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+                raise ValueError("FFmpeg created empty file")
             
             return output_path
             
         except Exception as e:
-            # Final fallback to librosa
-            try:
-                y, sr = librosa.load(
-                    file_path,
-                    offset=start_time,
-                    duration=duration,
-                    sr=22050
-                )
-                if output_path is None:
-                    fd, output_path = tempfile.mkstemp(suffix='.wav', prefix='segment_')
-                    os.close(fd)
-                sf.write(output_path, y, sr)
-                return output_path
-            except Exception as e2:
-                raise ValueError(f"Could not extract segment: {e2}")
+            # Don't fallback to librosa - it's too memory intensive
+            raise ValueError(f"Could not extract segment with FFmpeg: {e}. FFmpeg is required for memory-efficient processing.")
     
     def convert_to_wav(self, file_path: str, output_path: Optional[str] = None) -> str:
         """
