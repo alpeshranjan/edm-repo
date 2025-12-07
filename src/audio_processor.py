@@ -31,9 +31,9 @@ class AudioProcessor:
     
     def get_duration(self, file_path: str) -> float:
         """Get duration of audio file in seconds (memory efficient)"""
+        # Try FFprobe first (doesn't load file into memory)
+        import subprocess
         try:
-            # Try FFprobe first (doesn't load file into memory)
-            import subprocess
             cmd = [
                 'ffprobe',
                 '-v', 'error',
@@ -45,11 +45,18 @@ class AudioProcessor:
             if result.returncode == 0:
                 duration = float(result.stdout.decode().strip())
                 return duration
-        except:
-            pass
+            else:
+                error_msg = result.stderr.decode() if result.stderr else "FFprobe failed"
+                print(f"[AudioProcessor] FFprobe failed: {error_msg}")
+        except FileNotFoundError:
+            print("[AudioProcessor] FFprobe not found - FFmpeg not installed!")
+            raise ValueError("FFmpeg/FFprobe not installed. Please add FFmpeg buildpack in Render settings. See FFMPEG_SETUP.md")
+        except Exception as e:
+            print(f"[AudioProcessor] FFprobe error: {e}")
         
-        # Fallback to librosa (only if FFprobe fails)
+        # Fallback to librosa (only if FFprobe fails but FFmpeg might not be installed)
         try:
+            print("[AudioProcessor] Falling back to librosa for duration (less efficient)")
             duration = librosa.get_duration(path=file_path)
             return duration
         except Exception as e:
@@ -115,19 +122,55 @@ class AudioProcessor:
             )
             
             if result.returncode != 0:
-                # FFmpeg failed - raise error instead of falling back to librosa (memory intensive)
+                # FFmpeg failed
                 error_msg = result.stderr.decode() if result.stderr else "FFmpeg failed"
-                raise ValueError(f"FFmpeg failed to extract segment: {error_msg}")
+                print(f"[AudioProcessor] FFmpeg failed: {error_msg}")
+                # Try librosa fallback as last resort (better than crashing)
+                print("[AudioProcessor] Falling back to librosa (memory intensive)")
+                y, sr = librosa.load(
+                    file_path,
+                    offset=start_time,
+                    duration=duration,
+                    sr=22050
+                )
+                sf.write(output_path, y, sr)
+                return output_path
             
             # Verify file was created
             if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
-                raise ValueError("FFmpeg created empty file")
+                print("[AudioProcessor] FFmpeg created empty file, falling back to librosa")
+                y, sr = librosa.load(
+                    file_path,
+                    offset=start_time,
+                    duration=duration,
+                    sr=22050
+                )
+                sf.write(output_path, y, sr)
+                return output_path
             
             return output_path
             
+        except FileNotFoundError:
+            # FFmpeg not installed
+            print("[AudioProcessor] FFmpeg not found! Falling back to librosa (will use more memory)")
+            raise ValueError("FFmpeg not installed. Please add FFmpeg buildpack in Render settings. See FFMPEG_SETUP.md")
         except Exception as e:
-            # Don't fallback to librosa - it's too memory intensive
-            raise ValueError(f"Could not extract segment with FFmpeg: {e}. FFmpeg is required for memory-efficient processing.")
+            # Last resort - try librosa (better than crashing)
+            print(f"[AudioProcessor] Error with FFmpeg: {e}. Trying librosa fallback (memory intensive)")
+            try:
+                y, sr = librosa.load(
+                    file_path,
+                    offset=start_time,
+                    duration=duration,
+                    sr=22050
+                )
+                if output_path is None:
+                    fd, output_path = tempfile.mkstemp(suffix='.wav', prefix='segment_')
+                    os.close(fd)
+                sf.write(output_path, y, sr)
+                return output_path
+            except Exception as e2:
+                raise ValueError(f"Could not extract segment: {e2}")
     
     def convert_to_wav(self, file_path: str, output_path: Optional[str] = None) -> str:
         """

@@ -320,10 +320,10 @@ def recognize():
         # Provide more helpful error messages
         if "No module named" in error_msg:
             error_msg = f"Missing dependency: {error_msg}. Check requirements.txt"
-        elif "ffmpeg" in error_msg.lower():
-            error_msg = "FFmpeg not found. Required for audio processing."
+        elif "ffmpeg" in error_msg.lower() or "ffprobe" in error_msg.lower():
+            error_msg = f"FFmpeg not installed: {error_msg}. Add FFmpeg buildpack in Render settings. See FFMPEG_SETUP.md"
         elif "memory" in error_msg.lower() or "SIGKILL" in error_msg:
-            error_msg = "Out of memory. File too large. Try a smaller file or upgrade Render plan."
+            error_msg = "Out of memory. File too large or FFmpeg not working. Try a smaller file or add FFmpeg buildpack."
         elif "timeout" in error_msg.lower():
             error_msg = "Request timeout. File processing took too long."
         
