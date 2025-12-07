@@ -108,26 +108,8 @@ def recognize():
                         results.append(result)
                 
                 # Merge results
-                from src.cli import merge_results, deduplicate_tracks
-                from src.output.formatters import format_time
-                
-                # Filter by confidence threshold
-                valid_results = [r for r in results if r and r.confidence >= confidence_threshold]
-                
-                if not valid_results:
-                    continue
-                
-                # Get result with highest confidence
-                best_result = max(valid_results, key=lambda r: r.confidence)
-                
-                track = {
-                    "start_time": format_time(start_time),
-                    "end_time": format_time(end_time),
-                    "artist": best_result.artist or "Unknown Artist",
-                    "title": best_result.title or "Unknown Title",
-                    "confidence": best_result.confidence,
-                    "source": best_result.source
-                }
+                from src.cli import merge_results
+                track = merge_results(results, start_time, end_time, confidence_threshold)
                 if track:
                     all_tracks.append(track)
                     
