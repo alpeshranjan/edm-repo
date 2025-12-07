@@ -56,18 +56,49 @@ def index():
 @app.route('/api/status')
 def status():
     """API status endpoint"""
-    acrcloud = ACRCloudRecognizer()
-    audd = AuddRecognizer()
-    shazam = ShazamRecognizer()
-    songfinder = SongFinderRecognizer()
-    
-    return jsonify({
-        'acrcloud_available': acrcloud.is_available(),
-        'audd_available': audd.is_available(),
-        'shazam_available': shazam.is_available(),
-        'songfinder_available': songfinder.is_available(),
-        'status': 'ready' if any([acrcloud.is_available(), audd.is_available(), shazam.is_available(), songfinder.is_available()]) else 'no_apis'
-    })
+    try:
+        acrcloud = ACRCloudRecognizer()
+        audd = AuddRecognizer()
+        shazam = ShazamRecognizer()
+        songfinder = SongFinderRecognizer()
+        
+        return jsonify({
+            'acrcloud_available': acrcloud.is_available(),
+            'audd_available': audd.is_available(),
+            'shazam_available': shazam.is_available(),
+            'songfinder_available': songfinder.is_available(),
+            'status': 'ready' if any([acrcloud.is_available(), audd.is_available(), shazam.is_available(), songfinder.is_available()]) else 'no_apis'
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'error_type': type(e).__name__,
+            'status': 'error'
+        }), 500
+
+@app.route('/api/health')
+def health():
+    """Simple health check - no dependencies"""
+    try:
+        import subprocess
+        # Check if FFmpeg is available
+        ffmpeg_available = False
+        try:
+            result = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+            ffmpeg_available = result.returncode == 0
+        except:
+            pass
+        
+        return jsonify({
+            'status': 'ok',
+            'ffmpeg_available': ffmpeg_available,
+            'timestamp': time.time()
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 @app.route('/api/recognize', methods=['POST'])
 def recognize():

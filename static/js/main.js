@@ -25,9 +25,22 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
             let errorMessage = `HTTP ${response.status}: `;
             try {
                 const error = await response.json();
-                errorMessage += error.error || error.message || 'Server error';
-                if (error.traceback && response.status === 500) {
-                    errorMessage += '\n\nDetails: ' + error.traceback.split('\n')[0];
+                // Use error_details if available, otherwise error
+                errorMessage += error.error_details || error.error || error.message || 'Server error';
+                
+                // Add error type if available
+                if (error.error_type) {
+                    errorMessage += ` (${error.error_type})`;
+                }
+                
+                // Add hint if available
+                if (error.hint) {
+                    errorMessage += '\n\n💡 ' + error.hint;
+                }
+                
+                // Add traceback preview if available
+                if (error.traceback_preview && response.status === 500) {
+                    errorMessage += '\n\nLast error lines:\n' + error.traceback_preview.join('\n');
                 }
             } catch (e) {
                 // If JSON parsing fails, try to get text
@@ -35,7 +48,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
                     const text = await response.text();
                     errorMessage += text || 'Unknown error - check server logs';
                 } catch (e2) {
-                    errorMessage += 'Unknown error - check server logs';
+                    errorMessage += 'Unknown error - check server logs. Visit /api/health to check system status.';
                 }
             }
             throw new Error(errorMessage);
