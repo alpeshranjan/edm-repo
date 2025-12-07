@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: edm-track-recognizer
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: ACRCLOUD_ACCESS_KEY
+        sync: false
+      - key: ACRCLOUD_SECRET_KEY
+        sync: false
+      - key: AUDD_API_TOKEN
+        sync: false
+

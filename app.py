@@ -62,8 +62,8 @@ def recognize():
     # Get parameters
     format_type = request.form.get('format', 'json').lower()
     confidence_threshold = float(request.form.get('confidence_threshold', 0.5))
-    segment_length = int(request.form.get('segment_length', 45))
-    segment_overlap = int(request.form.get('segment_overlap', 15))
+    segment_length = int(request.form.get('segment_length', 60))  # Longer segments = fewer API calls
+    segment_overlap = int(request.form.get('segment_overlap', 20))
     
     # Save uploaded file
     filename = secure_filename(file.filename)
