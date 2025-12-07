@@ -1,5 +1,6 @@
 """Shazam API integration"""
 
+import os
 import requests
 from typing import Optional
 from .base import BaseRecognizer, RecognitionResult
@@ -7,12 +8,14 @@ from ..utils.config import Config
 
 
 class ShazamRecognizer(BaseRecognizer):
-    """Shazam API recognizer"""
+    """Shazam API recognizer (via RapidAPI)"""
     
-    API_URL = "https://shazam-api.com/v1/search"
+    # RapidAPI Shazam endpoint
+    API_URL = "https://shazam.p.rapidapi.com/songs/detect"
     
     def __init__(self):
         self.api_key = getattr(Config, 'SHAZAM_API_KEY', None)
+        self.api_host = "shazam.p.rapidapi.com"
     
     def is_available(self) -> bool:
         """Check if Shazam API is configured"""
@@ -37,27 +40,39 @@ class ShazamRecognizer(BaseRecognizer):
             # Read audio file
             with open(audio_file_path, 'rb') as f:
                 files = {
-                    'file': (audio_file_path, f, 'audio/mpeg')
+                    'upload_file': (os.path.basename(audio_file_path), f, 'audio/mpeg')
                 }
-                data = {
-                    'api_key': self.api_key
+                headers = {
+                    'X-RapidAPI-Key': self.api_key,
+                    'X-RapidAPI-Host': self.api_host
                 }
                 
-                # Make API request
-                response = requests.post(self.API_URL, files=files, data=data, timeout=30)
+                # Make API request to RapidAPI Shazam
+                response = requests.post(self.API_URL, files=files, headers=headers, timeout=30)
                 response.raise_for_status()
                 
                 result = response.json()
                 
-                # Parse response (adjust based on actual Shazam API response format)
+                # Parse RapidAPI Shazam response format
                 if result.get('status') == 'success' and result.get('track'):
                     track = result['track']
                     return RecognitionResult(
-                        artist=track.get('artist', {}).get('name') or track.get('subtitle'),
-                        title=track.get('title'),
-                        confidence=float(track.get('match', 0)) / 100.0 if track.get('match') else 0.8,  # Default high confidence
+                        artist=track.get('subtitle') or track.get('artists', [{}])[0].get('name', 'Unknown'),
+                        title=track.get('title', 'Unknown'),
+                        confidence=0.85,  # Shazam results are typically high confidence
                         source="shazam",
                         metadata=track
+                    )
+                elif result.get('matches') and len(result['matches']) > 0:
+                    # Alternative response format
+                    match = result['matches'][0]
+                    track_info = match.get('metadata', {})
+                    return RecognitionResult(
+                        artist=track_info.get('artist', {}).get('name') or track_info.get('artists', [{}])[0].get('name', 'Unknown'),
+                        title=track_info.get('title', 'Unknown'),
+                        confidence=0.85,
+                        source="shazam",
+                        metadata=result
                     )
             
             return None
