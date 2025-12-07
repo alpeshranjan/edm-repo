@@ -31,7 +31,7 @@ Go to: **https://rapidapi.com/apidojo/api/shazam**
 3. **Add New Variable**
    - Click "Add Environment Variable"
    - **Key**: `SHAZAM_API_KEY`
-   - **Value**: Paste your API key from shazam-api.com
+   - **Value**: Paste your RapidAPI key (the X-RapidAPI-Key you copied)
    - Click "Save Changes"
 
 4. **Redeploy**
@@ -53,18 +53,19 @@ You should see:
 }
 ```
 
-## Alternative: If shazam-api.com doesn't work
+## Pricing
 
-If `shazam-api.com` is not available or requires payment, you can:
+RapidAPI Shazam typically offers:
+- **Free tier**: Limited requests per month (check current limits)
+- **Paid tiers**: More requests available
 
-1. **Use RapidAPI Shazam**:
-   - Go to: https://rapidapi.com/apidojo/api/shazam
-   - Sign up and get API key
-   - Update the code to use RapidAPI endpoint
+Check the RapidAPI page for current pricing.
 
-2. **Skip Shazam** (optional):
-   - The app works fine with just ACRCloud
-   - Shazam is just an additional fallback for better coverage
+## Note
+
+- Shazam is **optional** - the app works fine with just ACRCloud
+- Shazam is an additional fallback for better coverage, especially for mainstream tracks
+- If you don't want to use Shazam, you can skip this setup
 
 ## Current Status
 
