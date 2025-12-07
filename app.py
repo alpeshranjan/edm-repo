@@ -9,6 +9,8 @@ import traceback
 from src.cli import main as cli_main
 from src.recognizers.acrcloud import ACRCloudRecognizer
 from src.recognizers.audd import AuddRecognizer
+from src.recognizers.shazam import ShazamRecognizer
+from src.recognizers.songfinder import SongFinderRecognizer
 from src.utils.config import Config
 from src.audio_processor import AudioProcessor
 from src.output.formatters import format_output
@@ -39,11 +41,15 @@ def status():
     """API status endpoint"""
     acrcloud = ACRCloudRecognizer()
     audd = AuddRecognizer()
+    shazam = ShazamRecognizer()
+    songfinder = SongFinderRecognizer()
     
     return jsonify({
         'acrcloud_available': acrcloud.is_available(),
         'audd_available': audd.is_available(),
-        'status': 'ready' if (acrcloud.is_available() or audd.is_available()) else 'no_apis'
+        'shazam_available': shazam.is_available(),
+        'songfinder_available': songfinder.is_available(),
+        'status': 'ready' if any([acrcloud.is_available(), audd.is_available(), shazam.is_available(), songfinder.is_available()]) else 'no_apis'
     })
 
 @app.route('/api/recognize', methods=['POST'])
@@ -74,12 +80,17 @@ def recognize():
         # Check API availability first
         acrcloud = ACRCloudRecognizer()
         audd = AuddRecognizer()
+        shazam = ShazamRecognizer()
+        songfinder = SongFinderRecognizer()
         
-        if not acrcloud.is_available() and not audd.is_available():
+        available_apis = [acrcloud, audd, shazam, songfinder]
+        if not any(api.is_available() for api in available_apis):
             return jsonify({
                 'error': 'No recognition APIs available. Please configure API keys in environment variables.',
                 'acrcloud_configured': acrcloud.is_available(),
-                'audd_configured': audd.is_available()
+                'audd_configured': audd.is_available(),
+                'shazam_configured': shazam.is_available(),
+                'songfinder_configured': songfinder.is_available()
             }), 500
         
         # Process the file
@@ -108,27 +119,49 @@ def recognize():
                 )
                 temp_files.append(segment_path)
                 
-                # Try recognition
+                # Try recognition with multiple APIs (try all available)
                 results = []
+                
+                # Try ACRCloud first (best for underground)
                 if acrcloud.is_available():
                     try:
                         result = acrcloud.recognize(segment_path, start_time, end_time - start_time)
                         if result:
                             results.append(result)
-                            print(f"Segment {start_time}-{end_time}: Found {result.artist} - {result.title} (conf: {result.confidence})")
+                            print(f"Segment {start_time}-{end_time}: ACRCloud found {result.artist} - {result.title} (conf: {result.confidence})")
                     except Exception as e:
                         error_msg = str(e)
-                        if "404" not in error_msg:  # Don't log 404s for every segment
-                            api_errors.append(f"ACRCloud error in segment {start_time}-{end_time}: {error_msg}")
+                        if "404" not in error_msg:
+                            api_errors.append(f"ACRCloud error: {error_msg}")
                 
-                # Try fallback
+                # Try Shazam (good coverage)
+                if (not results or (results and results[0].confidence < confidence_threshold)) and shazam.is_available():
+                    try:
+                        result = shazam.recognize(segment_path, start_time, end_time - start_time)
+                        if result:
+                            results.append(result)
+                            print(f"Segment {start_time}-{end_time}: Shazam found {result.artist} - {result.title}")
+                    except Exception as e:
+                        api_errors.append(f"Shazam error: {str(e)}")
+                
+                # Try SongFinder (underground focus)
+                if (not results or (results and results[0].confidence < confidence_threshold)) and songfinder.is_available():
+                    try:
+                        result = songfinder.recognize(segment_path, start_time, end_time - start_time)
+                        if result:
+                            results.append(result)
+                            print(f"Segment {start_time}-{end_time}: SongFinder found {result.artist} - {result.title}")
+                    except Exception as e:
+                        api_errors.append(f"SongFinder error: {str(e)}")
+                
+                # Try Audd.io as last fallback
                 if (not results or (results and results[0].confidence < confidence_threshold)) and audd.is_available():
                     try:
                         result = audd.recognize(segment_path, start_time, end_time - start_time)
                         if result:
                             results.append(result)
                     except Exception as e:
-                        api_errors.append(f"Audd error in segment {start_time}-{end_time}: {str(e)}")
+                        api_errors.append(f"Audd error: {str(e)}")
                 
                 # Merge results
                 from src.cli import merge_results
@@ -170,7 +203,9 @@ def recognize():
                 'segments_with_tracks': segments_with_results,
                 'api_status': {
                     'acrcloud': acrcloud.is_available(),
-                    'audd': audd.is_available()
+                    'audd': audd.is_available(),
+                    'shazam': shazam.is_available(),
+                    'songfinder': songfinder.is_available()
                 }
             }
             if api_errors:

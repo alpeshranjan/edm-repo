@@ -18,6 +18,12 @@ class Config:
     # Audd.io API credentials
     AUDD_API_TOKEN: Optional[str] = os.getenv("AUDD_API_TOKEN")
     
+    # Shazam API credentials (optional)
+    SHAZAM_API_KEY: Optional[str] = os.getenv("SHAZAM_API_KEY")
+    
+    # SongFinder API credentials (optional)
+    SONGFINDER_API_KEY: Optional[str] = os.getenv("SONGFINDER_API_KEY")
+    
     # Processing settings
     SEGMENT_LENGTH: int = int(os.getenv("SEGMENT_LENGTH", "45"))
     SEGMENT_OVERLAP: int = int(os.getenv("SEGMENT_OVERLAP", "15"))

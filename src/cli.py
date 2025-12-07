@@ -12,6 +12,8 @@ from tqdm import tqdm
 from .audio_processor import AudioProcessor
 from .recognizers.acrcloud import ACRCloudRecognizer
 from .recognizers.audd import AuddRecognizer
+from .recognizers.shazam import ShazamRecognizer
+from .recognizers.songfinder import SongFinderRecognizer
 from .recognizers.base import RecognitionResult
 from .output.formatters import format_output, format_time
 from .utils.config import Config
@@ -90,9 +92,11 @@ def main(audio_file: str, output_format: str, output: Optional[str], verbose: bo
     
     acrcloud = ACRCloudRecognizer()
     audd = AuddRecognizer()
+    shazam = ShazamRecognizer()
+    songfinder = SongFinderRecognizer()
     
     # Check if at least one recognizer is available
-    if not acrcloud.is_available() and not audd.is_available():
+    if not any([acrcloud.is_available(), audd.is_available(), shazam.is_available(), songfinder.is_available()]):
         click.echo("Error: No recognition APIs configured. Please set at least one API key.", err=True)
         sys.exit(1)
     

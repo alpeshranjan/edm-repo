@@ -50,13 +50,10 @@ Thumbs.db
 tracklist.md
 tracklist.json
 tracklist.csv
-*.md
 *.json
 *.csv
-!README.md
-!API_KEYS_SETUP.md
-!USAGE_GUIDE.md
-!QUICK_START.txt
+!*.md
+UGTRACKS.md
 UGTRACKS.md
 
 # Logs
