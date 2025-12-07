@@ -33,7 +33,7 @@ except ImportError as e:
     raise
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size (free tier limit)
 app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
 
 # Allowed audio extensions
@@ -116,6 +116,18 @@ def recognize():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     try:
         file.save(filepath)
+        
+        # Check file size - limit to 50MB for free tier
+        file_size = os.path.getsize(filepath)
+        max_size = 50 * 1024 * 1024  # 50MB
+        if file_size > max_size:
+            os.unlink(filepath)
+            return jsonify({
+                'error': f'File too large ({file_size / 1024 / 1024:.1f}MB). Maximum size: 50MB for free tier.',
+                'file_size_mb': round(file_size / 1024 / 1024, 1),
+                'max_size_mb': 50,
+                'hint': 'Try a smaller file or split your mix into smaller parts'
+            }), 400
     except Exception as e:
         return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
     
@@ -171,10 +183,12 @@ def recognize():
         print(f"[MAIN] API Status - ACRCloud: {acrcloud.is_available()}, Shazam: {shazam.is_available()}, SongFinder: {songfinder.is_available()}, Audd: {audd.is_available()}")
         
         # Limit segments for very large files to prevent memory issues
-        max_segments = 200  # Process max 200 segments (~2.5 hours at 45s segments)
+        # Free tier has ~512MB RAM, so be conservative
+        max_segments = 50  # Process max 50 segments (~37 minutes at 45s segments)
         if len(segments) > max_segments:
             segments = segments[:max_segments]
-            print(f"Large file detected. Processing first {max_segments} segments to prevent memory issues.")
+            print(f"[MAIN] Large file detected ({len(segments)} total segments). Processing first {max_segments} segments to prevent memory issues.")
+            api_errors.append(f"File too long - processing first {max_segments} of {len(segments)} segments")
         
         # Process each segment
         segments_processed = 0
@@ -259,8 +273,8 @@ def recognize():
                     except:
                         pass
                 
-                # Force garbage collection every 5 segments to free memory
-                if segments_processed % 5 == 0:
+                # Force garbage collection every 3 segments to free memory (more aggressive)
+                if segments_processed % 3 == 0:
                     gc.collect()
         
         print(f"Processed {segments_processed}/{len(segments)} segments, found {segments_with_results} with tracks")
