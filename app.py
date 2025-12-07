@@ -152,7 +152,8 @@ def recognize():
             }), 500
         all_tracks = []
         
-        print(f"Processing {len(segments)} segments...")
+        print(f"[MAIN] Processing {len(segments)} segments...")
+        print(f"[MAIN] API Status - ACRCloud: {acrcloud.is_available()}, Shazam: {shazam.is_available()}, SongFinder: {songfinder.is_available()}, Audd: {audd.is_available()}")
         
         # Limit segments for very large files to prevent memory issues
         max_segments = 200  # Process max 200 segments (~2.5 hours at 45s segments)
@@ -180,14 +181,17 @@ def recognize():
                 # Try ACRCloud first (best for underground)
                 if acrcloud.is_available():
                     try:
+                        print(f"[API] Calling ACRCloud for segment {start_time}-{end_time}...")
                         result = acrcloud.recognize(segment_path, start_time, end_time - start_time)
                         if result:
                             results.append(result)
-                            print(f"Segment {start_time}-{end_time}: ACRCloud found {result.artist} - {result.title} (conf: {result.confidence})")
+                            print(f"[API] ✓ Segment {start_time}-{end_time}: ACRCloud found {result.artist} - {result.title} (conf: {result.confidence})")
+                        else:
+                            print(f"[API] ✗ Segment {start_time}-{end_time}: ACRCloud found nothing")
                     except Exception as e:
                         error_msg = str(e)
-                        if "404" not in error_msg:
-                            api_errors.append(f"ACRCloud error: {error_msg}")
+                        print(f"[API] ✗ ACRCloud error for segment {start_time}-{end_time}: {error_msg}")
+                        api_errors.append(f"ACRCloud error: {error_msg}")
                 
                 # Try Shazam (good coverage)
                 if (not results or (results and results[0].confidence < confidence_threshold)) and shazam.is_available():
