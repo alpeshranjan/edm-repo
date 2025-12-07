@@ -112,7 +112,7 @@ Return ONLY valid JSON, no other text."""
         return None
     
     def _call_together_ai(self, prompt: str) -> Optional[str]:
-        """Call Together AI API"""
+        """Call Together AI API (fast, optimized)"""
         try:
             headers = {
                 'Authorization': f'Bearer {self.together_key}',
@@ -121,10 +121,11 @@ Return ONLY valid JSON, no other text."""
             data = {
                 'model': 'mistralai/Mixtral-8x7B-Instruct-v0.1',
                 'messages': [{'role': 'user', 'content': prompt}],
-                'temperature': 0.3,
-                'max_tokens': 500
+                'temperature': 0.2,  # Lower = faster, more deterministic
+                'max_tokens': 300,  # Reduced for speed
+                'stop': ['\n\n']  # Stop early if possible
             }
-            response = requests.post(self.TOGETHER_API_URL, json=data, headers=headers, timeout=10)
+            response = requests.post(self.TOGETHER_API_URL, json=data, headers=headers, timeout=5)  # Shorter timeout
             if response.status_code == 200:
                 result = response.json()
                 return result.get('choices', [{}])[0].get('message', {}).get('content')
@@ -133,11 +134,11 @@ Return ONLY valid JSON, no other text."""
         return None
     
     def _call_huggingface(self, prompt: str) -> Optional[str]:
-        """Call Hugging Face Inference API"""
+        """Call Hugging Face Inference API (fast)"""
         try:
             headers = {'Authorization': f'Bearer {self.huggingface_key}'}
-            data = {'inputs': prompt}
-            response = requests.post(self.HUGGINGFACE_API_URL, json=data, headers=headers, timeout=15)
+            data = {'inputs': prompt, 'parameters': {'max_new_tokens': 200, 'temperature': 0.2}}
+            response = requests.post(self.HUGGINGFACE_API_URL, json=data, headers=headers, timeout=8)  # Shorter timeout
             if response.status_code == 200:
                 result = response.json()
                 if isinstance(result, list) and len(result) > 0:
@@ -147,7 +148,7 @@ Return ONLY valid JSON, no other text."""
         return None
     
     def _call_openai(self, prompt: str) -> Optional[str]:
-        """Call OpenAI API"""
+        """Call OpenAI API (fast, optimized)"""
         try:
             headers = {
                 'Authorization': f'Bearer {self.openai_key}',
@@ -156,10 +157,10 @@ Return ONLY valid JSON, no other text."""
             data = {
                 'model': 'gpt-3.5-turbo',
                 'messages': [{'role': 'user', 'content': prompt}],
-                'temperature': 0.3,
-                'max_tokens': 500
+                'temperature': 0.2,  # Lower = faster
+                'max_tokens': 300  # Reduced for speed
             }
-            response = requests.post('https://api.openai.com/v1/chat/completions', json=data, headers=headers, timeout=10)
+            response = requests.post('https://api.openai.com/v1/chat/completions', json=data, headers=headers, timeout=5)
             if response.status_code == 200:
                 result = response.json()
                 return result.get('choices', [{}])[0].get('message', {}).get('content')

@@ -109,8 +109,13 @@ def main(audio_file: str, output_format: str, output: Optional[str], verbose: bo
                         if result:
                             results.append(result)
                     
-                    # Merge results
-                    track = merge_results(results, start_time, end_time, Config.CONFIDENCE_THRESHOLD)
+                    # Merge results (AI only if results conflict)
+                    use_ai = len(results) > 1 and any(
+                        r1.artist != r2.artist or r1.title != r2.title 
+                        for i, r1 in enumerate(results) 
+                        for r2 in results[i+1:]
+                    )
+                    track = merge_results(results, start_time, end_time, Config.CONFIDENCE_THRESHOLD, use_ai=use_ai)
                     if track:
                         all_tracks.append(track)
                     
@@ -127,8 +132,9 @@ def main(audio_file: str, output_format: str, output: Optional[str], verbose: bo
             except:
                 pass
         
-        # Deduplicate tracks
-        unique_tracks = deduplicate_tracks(all_tracks)
+        # Deduplicate tracks (AI only for large tracklists)
+        use_ai_dedup = len(all_tracks) > 10
+        unique_tracks = deduplicate_tracks(all_tracks, use_ai=use_ai_dedup)
         
         if verbose:
             click.echo(f"\nFound {len(unique_tracks)} unique tracks")

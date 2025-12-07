@@ -282,8 +282,14 @@ def recognize():
                     except Exception as e:
                         api_errors.append(f"Audd error: {str(e)}")
                 
-                # Merge results
-                track = merge_results(results, start_time, end_time, confidence_threshold)
+                # Merge results (AI only used if results conflict)
+                # Fast by default - AI only when APIs disagree
+                use_ai_merge = len(results) > 1 and any(
+                    r1.artist != r2.artist or r1.title != r2.title 
+                    for i, r1 in enumerate(results) 
+                    for r2 in results[i+1:]
+                )
+                track = merge_results(results, start_time, end_time, confidence_threshold, use_ai=use_ai_merge)
                 if track:
                     all_tracks.append(track)
                     segments_with_results += 1
@@ -310,8 +316,10 @@ def recognize():
         
         print(f"Processed {segments_processed}/{len(segments)} segments, found {segments_with_results} with tracks")
         
-        # Deduplicate
-        unique_tracks = deduplicate_tracks(all_tracks)
+        # Deduplicate (AI only used if enabled and many tracks)
+        # Fast by default - AI only for large tracklists
+        use_ai_dedup = len(all_tracks) > 10  # Only use AI for 10+ tracks
+        unique_tracks = deduplicate_tracks(all_tracks, use_ai=use_ai_dedup)
         
         # Format output
         if format_type == 'json':

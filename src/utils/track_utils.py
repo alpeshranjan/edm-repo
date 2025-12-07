@@ -5,24 +5,12 @@ from ..recognizers.base import RecognitionResult
 from ..output.formatters import format_time
 
 
-def deduplicate_tracks(tracks: list[dict], use_ai: bool = True) -> list[dict]:
-    """Remove duplicate tracks (with optional AI-powered smart deduplication)"""
+def deduplicate_tracks(tracks: list[dict], use_ai: bool = False) -> list[dict]:
+    """Remove duplicate tracks (AI only used for final batch, not per-track)"""
     if not tracks:
         return []
     
-    # Use AI for smart deduplication if available
-    if use_ai and len(tracks) > 1:
-        try:
-            from ..ai.orchestrator import AIOrchestrator
-            orchestrator = AIOrchestrator()
-            if orchestrator.is_available():
-                unique = orchestrator.smart_deduplicate(tracks)
-                print(f"[AI] Smart deduplication: {len(tracks)} -> {len(unique)} tracks")
-                return unique
-        except Exception as e:
-            print(f"[AI] Smart deduplication unavailable: {e}, using fallback")
-    
-    # Fallback to simple deduplication
+    # Fast simple deduplication first
     seen = set()
     unique_tracks = []
     
@@ -32,29 +20,51 @@ def deduplicate_tracks(tracks: list[dict], use_ai: bool = True) -> list[dict]:
             seen.add(key)
             unique_tracks.append(track)
     
+    # Only use AI for final smart deduplication if many tracks remain
+    # This is fast - AI called once at the end, not per-track
+    if use_ai and len(unique_tracks) > 5:  # Only for larger tracklists
+        try:
+            from ..ai.orchestrator import AIOrchestrator
+            orchestrator = AIOrchestrator()
+            if orchestrator.is_available():
+                # Batch process all tracks at once (much faster)
+                smart_unique = orchestrator.smart_deduplicate(unique_tracks)
+                if len(smart_unique) < len(unique_tracks):
+                    print(f"[AI] Smart deduplication: {len(unique_tracks)} -> {len(smart_unique)} tracks")
+                    return smart_unique
+        except Exception as e:
+            print(f"[AI] Unavailable: {e}, using simple deduplication")
+    
     return unique_tracks
 
 
-def merge_results(results: list[RecognitionResult], start_time: float, end_time: float, confidence_threshold: float, use_ai: bool = True) -> Optional[dict]:
-    """Merge recognition results and return best match (with optional AI validation)"""
+def merge_results(results: list[RecognitionResult], start_time: float, end_time: float, confidence_threshold: float, use_ai: bool = False) -> Optional[dict]:
+    """Merge recognition results and return best match (AI only used when results conflict)"""
     # Filter by confidence threshold
     valid_results = [r for r in results if r and r.confidence >= confidence_threshold]
     
     if not valid_results:
         return None
     
-    # Use AI to validate and rank if available
+    # Only use AI if results conflict (different tracks from different APIs)
+    # This is much faster - AI only called when needed
     if use_ai and len(valid_results) > 1:
-        try:
-            from ..ai.orchestrator import AIOrchestrator
-            orchestrator = AIOrchestrator()
-            if orchestrator.is_available():
-                valid_results = orchestrator.validate_and_rank_results(valid_results)
-                print(f"[AI] Validated and ranked {len(valid_results)} results")
-        except Exception as e:
-            print(f"[AI] Orchestrator unavailable: {e}, using fallback")
+        # Check if results conflict (different artist/title)
+        artists = set(r.artist.lower().strip() if r.artist else "" for r in valid_results)
+        titles = set(r.title.lower().strip() if r.title else "" for r in valid_results)
+        
+        # Only use AI if there's actual conflict
+        if len(artists) > 1 or len(titles) > 1:
+            try:
+                from ..ai.orchestrator import AIOrchestrator
+                orchestrator = AIOrchestrator()
+                if orchestrator.is_available():
+                    valid_results = orchestrator.validate_and_rank_results(valid_results)
+                    print(f"[AI] Resolved conflict: {len(valid_results)} results")
+            except Exception as e:
+                print(f"[AI] Unavailable: {e}, using confidence-based selection")
     
-    # Get best result (now AI-validated if available)
+    # Get best result (AI-validated if conflict, otherwise highest confidence)
     best_result = valid_results[0] if valid_results else max(valid_results, key=lambda r: r.confidence)
     
     return {
