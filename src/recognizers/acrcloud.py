@@ -91,11 +91,16 @@ class ACRCloudRecognizer(BaseRecognizer):
             for region in self.API_REGIONS:
                 api_url = f"https://identify-{region}.acrcloud.com/v1/identify"
                 try:
+                    print(f"[ACRCloud] Trying region {region}...")
                     response = requests.post(api_url, files=files, data=data, timeout=30)
+                    print(f"[ACRCloud] Response status: {response.status_code}")
                     response.raise_for_status()
+                    print(f"[ACRCloud] ✓ Success with region {region}")
                     break  # Success, exit loop
                 except requests.exceptions.HTTPError as e:
                     last_error = e
+                    error_text = response.text[:300] if response else "No response"
+                    print(f"[ACRCloud] ✗ Region {region} HTTP {response.status_code if response else 'N/A'}: {error_text}")
                     if response and response.status_code == 404:
                         # Try next region
                         continue
@@ -104,6 +109,7 @@ class ACRCloudRecognizer(BaseRecognizer):
                         raise
                 except Exception as e:
                     last_error = e
+                    print(f"[ACRCloud] ✗ Region {region} exception: {str(e)[:200]}")
                     continue
             
             # If all regions failed, raise the last error
@@ -111,22 +117,30 @@ class ACRCloudRecognizer(BaseRecognizer):
                 raise last_error or Exception("All API regions failed")
             
             result = response.json()
+            print(f"[ACRCloud] Response JSON: {str(result)[:500]}")
             
             # Parse response
-            if result.get('status', {}).get('code') == 0:
+            status_code = result.get('status', {}).get('code')
+            print(f"[ACRCloud] Status code: {status_code}")
+            
+            if status_code == 0:
                 metadata = result.get('metadata', {})
                 music = metadata.get('music', [])
                 
                 if music and len(music) > 0:
                     track = music[0]
+                    artist = track.get('artists', [{}])[0].get('name') if track.get('artists') else None
+                    title = track.get('title')
+                    print(f"[ACRCloud] ✓ Found: {artist} - {title}")
                     return RecognitionResult(
-                        artist=track.get('artists', [{}])[0].get('name') if track.get('artists') else None,
-                        title=track.get('title'),
+                        artist=artist,
+                        title=title,
                         confidence=float(track.get('score', 0)) / 100.0 if track.get('score') else 0.0,
                         source="acrcloud",
                         metadata=track
                     )
             
+            print(f"[ACRCloud] ✗ No match found. Status code: {status_code}")
             return None
             
         except Exception as e:
