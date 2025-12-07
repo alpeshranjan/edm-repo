@@ -42,6 +42,10 @@ ENV/
 segment_*.wav
 converted_*.wav
 
+# OS
+.DS_Store
+Thumbs.db
+
 # Generated output files
 tracklist.md
 tracklist.json
@@ -53,12 +57,9 @@ tracklist.csv
 !API_KEYS_SETUP.md
 !USAGE_GUIDE.md
 !QUICK_START.txt
+UGTRACKS.md
 
 # Logs
 *.log
 processing.log
-
-# OS
-.DS_Store
-Thumbs.db
-
+UGTRACKS*.log

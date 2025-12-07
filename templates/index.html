@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EDM Track Recognizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>EDM Track Recognizer</h1>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <input type="file" id="audioFile" name="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aac" required>
+            
+            <div class="settings">
+                <label>Format: <select name="format"><option value="markdown" selected>Markdown</option><option value="json">JSON</option><option value="csv">CSV</option></select></label>
+                <label>Confidence: <input type="range" name="confidence_threshold" min="0" max="1" step="0.1" value="0.3" id="conf"><span id="confVal">0.3</span></label>
+            </div>
+            
+            <button type="submit">Recognize</button>
+        </form>
+
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

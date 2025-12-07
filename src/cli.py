@@ -167,12 +167,30 @@ def main(audio_file: str, output_format: str, output: Optional[str], verbose: bo
         output_text = format_output(unique_tracks, output_format)
         
         if output:
-            with open(output, 'w') as f:
-                f.write(output_text)
-            click.echo(f"Results saved to {output}")
+            try:
+                with open(output, 'w') as f:
+                    f.write(output_text)
+                click.echo(f"Results saved to {output}")
+            except Exception as e:
+                click.echo(f"Error writing output file: {e}", err=True)
+                # Fallback to stdout
+                click.echo(output_text)
         else:
             click.echo(output_text)
         
+    except KeyboardInterrupt:
+        click.echo("\nProcessing interrupted by user", err=True)
+        # Try to save partial results if output file specified
+        if output and 'all_tracks' in locals() and all_tracks:
+            try:
+                unique_tracks = deduplicate_tracks(all_tracks)
+                output_text = format_output(unique_tracks, output_format)
+                with open(output, 'w') as f:
+                    f.write(output_text)
+                click.echo(f"Partial results saved to {output}")
+            except:
+                pass
+        sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         if verbose:
