@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 import traceback
 import urllib.parse
 
-from src.cli import main as cli_main
+from src.cli import main as cli_main, merge_results, deduplicate_tracks
 from src.recognizers.acrcloud import ACRCloudRecognizer
 from src.recognizers.audd import AuddRecognizer
 from src.recognizers.shazam import ShazamRecognizer
@@ -219,7 +219,6 @@ def recognize():
                         api_errors.append(f"Audd error: {str(e)}")
                 
                 # Merge results
-                from src.cli import merge_results
                 track = merge_results(results, start_time, end_time, confidence_threshold)
                 if track:
                     all_tracks.append(track)
@@ -247,22 +246,7 @@ def recognize():
         
         print(f"Processed {segments_processed}/{len(segments)} segments, found {segments_with_results} with tracks")
         
-        # Clean up uploaded file
-        try:
-            if os.path.exists(filepath):
-                os.unlink(filepath)
-        except:
-            pass
-        
-        # Clean up uploaded file
-        try:
-            if os.path.exists(filepath):
-                os.unlink(filepath)
-        except:
-            pass
-        
         # Deduplicate
-        from src.cli import deduplicate_tracks
         unique_tracks = deduplicate_tracks(all_tracks)
         
         # Format output
