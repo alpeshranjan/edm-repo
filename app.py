@@ -96,6 +96,10 @@ def recognize():
         print(f"Processing {len(segments)} segments...")
         
         # Process each segment
+        segments_processed = 0
+        segments_with_results = 0
+        api_errors = []
+        
         for start_time, end_time in segments:
             try:
                 # Extract segment
@@ -107,28 +111,42 @@ def recognize():
                 # Try recognition
                 results = []
                 if acrcloud.is_available():
-                    result = acrcloud.recognize(segment_path, start_time, end_time - start_time)
-                    if result:
-                        results.append(result)
+                    try:
+                        result = acrcloud.recognize(segment_path, start_time, end_time - start_time)
+                        if result:
+                            results.append(result)
+                            print(f"Segment {start_time}-{end_time}: Found {result.artist} - {result.title} (conf: {result.confidence})")
+                    except Exception as e:
+                        error_msg = str(e)
+                        if "404" not in error_msg:  # Don't log 404s for every segment
+                            api_errors.append(f"ACRCloud error in segment {start_time}-{end_time}: {error_msg}")
                 
                 # Try fallback
-                if (not results or results[0].confidence < confidence_threshold) and audd.is_available():
-                    result = audd.recognize(segment_path, start_time, end_time - start_time)
-                    if result:
-                        results.append(result)
+                if (not results or (results and results[0].confidence < confidence_threshold)) and audd.is_available():
+                    try:
+                        result = audd.recognize(segment_path, start_time, end_time - start_time)
+                        if result:
+                            results.append(result)
+                    except Exception as e:
+                        api_errors.append(f"Audd error in segment {start_time}-{end_time}: {str(e)}")
                 
                 # Merge results
                 from src.cli import merge_results
                 track = merge_results(results, start_time, end_time, confidence_threshold)
                 if track:
                     all_tracks.append(track)
+                    segments_with_results += 1
+                
+                segments_processed += 1
                     
             except Exception as e:
                 error_msg = str(e)
                 print(f"Error processing segment {start_time}-{end_time}: {error_msg}")
-                # Log to response for debugging
                 import traceback
                 traceback.print_exc()
+                api_errors.append(f"Segment {start_time}-{end_time}: {error_msg}")
+        
+        print(f"Processed {segments_processed}/{len(segments)} segments, found {segments_with_results} with tracks")
         
         # Clean up temp files
         for temp_file in temp_files:
@@ -143,20 +161,27 @@ def recognize():
         
         # Format output
         if format_type == 'json':
-            return jsonify({
+            response_data = {
                 'success': True,
                 'tracks': unique_tracks,
                 'count': len(unique_tracks),
-                'segments_processed': len(segments),
+                'segments_processed': segments_processed,
+                'segments_total': len(segments),
+                'segments_with_tracks': segments_with_results,
                 'api_status': {
                     'acrcloud': acrcloud.is_available(),
                     'audd': audd.is_available()
                 }
-            })
+            }
+            if api_errors:
+                response_data['warnings'] = api_errors[:5]  # First 5 errors
+            return jsonify(response_data)
         else:
             output_text = format_output(unique_tracks, format_type)
             if len(unique_tracks) == 0:
-                output_text += f"\n\nNote: No tracks found. Processed {len(segments)} segments."
+                output_text += f"\n\nNote: No tracks found. Processed {segments_processed}/{len(segments)} segments."
+                if api_errors:
+                    output_text += f"\nErrors encountered: {len(api_errors)}"
             return output_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
             
     except Exception as e:
