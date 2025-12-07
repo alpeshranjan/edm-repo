@@ -15,7 +15,7 @@ from .recognizers.audd import AuddRecognizer
 from .recognizers.shazam import ShazamRecognizer
 from .recognizers.songfinder import SongFinderRecognizer
 from .recognizers.base import RecognitionResult
-from .output.formatters import format_output
+from .output.formatters import format_output, format_time
 from .utils.config import Config
 from .utils.track_utils import merge_results, deduplicate_tracks
 
