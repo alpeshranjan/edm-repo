@@ -1,10 +1,12 @@
 """Flask web application for EDM Track Recognition"""
 
 import os
+import time
 import tempfile
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import traceback
+import urllib.parse
 
 from src.cli import main as cli_main
 from src.recognizers.acrcloud import ACRCloudRecognizer
@@ -62,19 +64,45 @@ def recognize():
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
     
-    if not allowed_file(file.filename):
+    # Decode URL-encoded filename first
+    original_filename = file.filename
+    if '%' in original_filename:
+        try:
+            original_filename = urllib.parse.unquote(original_filename)
+        except Exception as e:
+            app.logger.warning(f"Failed to decode filename: {e}")
+    
+    # Check file extension after decoding
+    if not allowed_file(original_filename):
         return jsonify({'error': f'Invalid file type. Allowed: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
     
     # Get parameters
     format_type = request.form.get('format', 'json').lower()
-    confidence_threshold = float(request.form.get('confidence_threshold', 0.5))
-    segment_length = int(request.form.get('segment_length', 60))  # Longer segments = fewer API calls
-    segment_overlap = int(request.form.get('segment_overlap', 20))
+    try:
+        confidence_threshold = float(request.form.get('confidence_threshold', 0.5))
+        segment_length = int(request.form.get('segment_length', 60))
+        segment_overlap = int(request.form.get('segment_overlap', 20))
+    except (ValueError, TypeError) as e:
+        return jsonify({'error': f'Invalid parameter: {str(e)}'}), 400
     
     # Save uploaded file
-    filename = secure_filename(file.filename)
+    # Use secure_filename to sanitize, but handle edge cases
+    try:
+        filename = secure_filename(original_filename)
+        if not filename or filename.strip() == '':
+            # Fallback if secure_filename returns empty or invalid
+            ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'mp3'
+            filename = f"upload_{int(time.time())}.{ext}"
+    except Exception as e:
+        app.logger.warning(f"secure_filename failed: {e}, using fallback")
+        ext = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'mp3'
+        filename = f"upload_{int(time.time())}.{ext}"
+    
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+    try:
+        file.save(filepath)
+    except Exception as e:
+        return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
     
     try:
         # Check API availability first
