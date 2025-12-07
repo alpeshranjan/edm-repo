@@ -1,0 +1,19 @@
+QUICK START GUIDE
+==================
+
+1. Open Terminal (Cmd+Space, type "Terminal")
+
+2. Navigate to project:
+   cd "/Users/alpesh/Downloads/untitled folder 2"
+
+3. Activate virtual environment:
+   source venv/bin/activate
+
+4. Run the tool:
+   python -m src.cli ~/Downloads/your_file.mp3
+
+5. Save results to file:
+   python -m src.cli ~/Downloads/your_file.mp3 --output tracklist.md
+
+That's it! Check the USAGE_GUIDE.md for more options.
+
