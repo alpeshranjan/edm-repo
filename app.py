@@ -130,22 +130,28 @@ def recognize():
         # Get segments
         segments = processor.segment_audio(filepath)
         all_tracks = []
-        temp_files = []
         
         print(f"Processing {len(segments)} segments...")
+        
+        # Limit segments for very large files to prevent memory issues
+        max_segments = 200  # Process max 200 segments (~2.5 hours at 45s segments)
+        if len(segments) > max_segments:
+            segments = segments[:max_segments]
+            print(f"Large file detected. Processing first {max_segments} segments to prevent memory issues.")
         
         # Process each segment
         segments_processed = 0
         segments_with_results = 0
         api_errors = []
+        import gc  # Garbage collection
         
         for start_time, end_time in segments:
+            segment_path = None
             try:
                 # Extract segment
                 segment_path = processor.extract_segment(
                     filepath, start_time, end_time - start_time
                 )
-                temp_files.append(segment_path)
                 
                 # Try recognition with multiple APIs (try all available)
                 results = []
@@ -206,15 +212,33 @@ def recognize():
                 import traceback
                 traceback.print_exc()
                 api_errors.append(f"Segment {start_time}-{end_time}: {error_msg}")
+            finally:
+                # CRITICAL: Delete segment file immediately after processing to free memory
+                if segment_path and os.path.exists(segment_path):
+                    try:
+                        os.unlink(segment_path)
+                    except:
+                        pass
+                
+                # Force garbage collection every 5 segments to free memory
+                if segments_processed % 5 == 0:
+                    gc.collect()
         
         print(f"Processed {segments_processed}/{len(segments)} segments, found {segments_with_results} with tracks")
         
-        # Clean up temp files
-        for temp_file in temp_files:
-            try:
-                os.unlink(temp_file)
-            except:
-                pass
+        # Clean up uploaded file
+        try:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+        except:
+            pass
+        
+        # Clean up uploaded file
+        try:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+        except:
+            pass
         
         # Deduplicate
         from src.cli import deduplicate_tracks

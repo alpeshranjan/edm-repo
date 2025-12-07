@@ -58,7 +58,7 @@ class AudioProcessor:
     
     def extract_segment(self, file_path: str, start_time: float, duration: float, output_path: Optional[str] = None) -> str:
         """
-        Extract a segment from audio file
+        Extract a segment from audio file using FFmpeg (memory efficient)
         
         Args:
             file_path: Path to source audio file
@@ -70,26 +70,72 @@ class AudioProcessor:
             Path to extracted segment file
         """
         try:
-            # Load audio segment
-            y, sr = librosa.load(
-                file_path,
-                offset=start_time,
-                duration=duration,
-                sr=22050  # Standard sample rate for API compatibility
-            )
+            # Use FFmpeg for memory-efficient extraction (doesn't load full file)
+            import subprocess
             
             # Create output file if not provided
             if output_path is None:
                 fd, output_path = tempfile.mkstemp(suffix='.wav', prefix='segment_')
                 os.close(fd)
             
-            # Save as WAV (most compatible format for APIs)
-            sf.write(output_path, y, sr)
+            # Use FFmpeg to extract segment directly (much more memory efficient)
+            cmd = [
+                'ffmpeg',
+                '-i', file_path,
+                '-ss', str(start_time),
+                '-t', str(duration),
+                '-ar', '22050',  # Sample rate
+                '-ac', '1',  # Mono
+                '-y',  # Overwrite output
+                output_path
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30
+            )
+            
+            if result.returncode != 0:
+                # Fallback to librosa if FFmpeg fails
+                y, sr = librosa.load(
+                    file_path,
+                    offset=start_time,
+                    duration=duration,
+                    sr=22050
+                )
+                sf.write(output_path, y, sr)
+            else:
+                # Verify file was created
+                if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+                    # Fallback to librosa
+                    y, sr = librosa.load(
+                        file_path,
+                        offset=start_time,
+                        duration=duration,
+                        sr=22050
+                    )
+                    sf.write(output_path, y, sr)
             
             return output_path
             
         except Exception as e:
-            raise ValueError(f"Could not extract segment: {e}")
+            # Final fallback to librosa
+            try:
+                y, sr = librosa.load(
+                    file_path,
+                    offset=start_time,
+                    duration=duration,
+                    sr=22050
+                )
+                if output_path is None:
+                    fd, output_path = tempfile.mkstemp(suffix='.wav', prefix='segment_')
+                    os.close(fd)
+                sf.write(output_path, y, sr)
+                return output_path
+            except Exception as e2:
+                raise ValueError(f"Could not extract segment: {e2}")
     
     def convert_to_wav(self, file_path: str, output_path: Optional[str] = None) -> str:
         """
