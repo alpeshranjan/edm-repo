@@ -8,14 +8,29 @@ from werkzeug.utils import secure_filename
 import traceback
 import urllib.parse
 
-from src.cli import main as cli_main, merge_results, deduplicate_tracks
-from src.recognizers.acrcloud import ACRCloudRecognizer
-from src.recognizers.audd import AuddRecognizer
-from src.recognizers.shazam import ShazamRecognizer
-from src.recognizers.songfinder import SongFinderRecognizer
-from src.utils.config import Config
-from src.audio_processor import AudioProcessor
-from src.output.formatters import format_output
+# Import with error handling
+try:
+    from src.utils.track_utils import merge_results, deduplicate_tracks
+except ImportError as e:
+    print(f"ERROR: Failed to import track_utils: {e}")
+    raise
+
+try:
+    from src.recognizers.acrcloud import ACRCloudRecognizer
+    from src.recognizers.audd import AuddRecognizer
+    from src.recognizers.shazam import ShazamRecognizer
+    from src.recognizers.songfinder import SongFinderRecognizer
+except ImportError as e:
+    print(f"ERROR: Failed to import recognizers: {e}")
+    raise
+
+try:
+    from src.utils.config import Config
+    from src.audio_processor import AudioProcessor
+    from src.output.formatters import format_output
+except ImportError as e:
+    print(f"ERROR: Failed to import core modules: {e}")
+    raise
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max file size
