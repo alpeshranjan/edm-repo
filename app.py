@@ -357,12 +357,16 @@ def recognize():
             error_msg = "Out of memory. File too large or FFmpeg not working. Try a smaller file or add FFmpeg buildpack."
         elif "timeout" in error_msg.lower():
             error_msg = "Request timeout. File processing took too long."
+        elif "Unknown error" in error_msg:
+            error_msg = f"Unexpected error: {error_msg}. Check server logs."
         
+        # Always return error details (not just "Unknown error")
         return jsonify({
             'error': error_msg,
             'error_type': type(e).__name__,
-            'traceback': error_traceback if app.debug else None,
-            'hint': 'Check Render logs for full details'
+            'error_details': str(e),
+            'traceback_preview': error_traceback.split('\n')[-3:] if error_traceback else None,
+            'hint': 'Check Render logs for full details. Visit /api/health to check system status.'
         }), 500
     
     finally:
