@@ -106,10 +106,16 @@ def recognize():
     
     try:
         # Check API availability first
-        acrcloud = ACRCloudRecognizer()
-        audd = AuddRecognizer()
-        shazam = ShazamRecognizer()
-        songfinder = SongFinderRecognizer()
+        try:
+            acrcloud = ACRCloudRecognizer()
+            audd = AuddRecognizer()
+            shazam = ShazamRecognizer()
+            songfinder = SongFinderRecognizer()
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to initialize API recognizers: {str(e)}',
+                'error_type': type(e).__name__
+            }), 500
         
         available_apis = [acrcloud, audd, shazam, songfinder]
         if not any(api.is_available() for api in available_apis):
@@ -118,17 +124,32 @@ def recognize():
                 'acrcloud_configured': acrcloud.is_available(),
                 'audd_configured': audd.is_available(),
                 'shazam_configured': shazam.is_available(),
-                'songfinder_configured': songfinder.is_available()
+                'songfinder_configured': songfinder.is_available(),
+                'hint': 'At least ACRCLOUD_ACCESS_KEY and ACRCLOUD_SECRET_KEY must be set'
             }), 500
         
         # Process the file
-        processor = AudioProcessor(
-            segment_length=segment_length,
-            segment_overlap=segment_overlap
-        )
+        try:
+            processor = AudioProcessor(
+                segment_length=segment_length,
+                segment_overlap=segment_overlap
+            )
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to initialize audio processor: {str(e)}',
+                'error_type': type(e).__name__,
+                'hint': 'Check if librosa and soundfile are installed'
+            }), 500
         
         # Get segments
-        segments = processor.segment_audio(filepath)
+        try:
+            segments = processor.segment_audio(filepath)
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to process audio file: {str(e)}',
+                'error_type': type(e).__name__,
+                'hint': 'File may be corrupted or unsupported format'
+            }), 500
         all_tracks = []
         
         print(f"Processing {len(segments)} segments...")
@@ -274,11 +295,26 @@ def recognize():
     except Exception as e:
         error_msg = str(e)
         error_traceback = traceback.format_exc()
+        app.logger.error(f"ERROR in recognize(): {error_msg}")
+        app.logger.error(error_traceback)
         print(f"ERROR: {error_msg}")
         print(error_traceback)
+        
+        # Provide more helpful error messages
+        if "No module named" in error_msg:
+            error_msg = f"Missing dependency: {error_msg}. Check requirements.txt"
+        elif "ffmpeg" in error_msg.lower():
+            error_msg = "FFmpeg not found. Required for audio processing."
+        elif "memory" in error_msg.lower() or "SIGKILL" in error_msg:
+            error_msg = "Out of memory. File too large. Try a smaller file or upgrade Render plan."
+        elif "timeout" in error_msg.lower():
+            error_msg = "Request timeout. File processing took too long."
+        
         return jsonify({
             'error': error_msg,
-            'traceback': error_traceback if app.debug else 'Enable debug mode for details'
+            'error_type': type(e).__name__,
+            'traceback': error_traceback if app.debug else None,
+            'hint': 'Check Render logs for full details'
         }), 500
     
     finally:

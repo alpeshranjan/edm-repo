@@ -22,8 +22,23 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         });
         
         if (!response.ok) {
-            const error = await response.json().catch(() => ({error: 'Unknown error'}));
-            throw new Error(error.error || error.message || 'Failed');
+            let errorMessage = `HTTP ${response.status}: `;
+            try {
+                const error = await response.json();
+                errorMessage += error.error || error.message || 'Server error';
+                if (error.traceback && response.status === 500) {
+                    errorMessage += '\n\nDetails: ' + error.traceback.split('\n')[0];
+                }
+            } catch (e) {
+                // If JSON parsing fails, try to get text
+                try {
+                    const text = await response.text();
+                    errorMessage += text || 'Unknown error - check server logs';
+                } catch (e2) {
+                    errorMessage += 'Unknown error - check server logs';
+                }
+            }
+            throw new Error(errorMessage);
         }
         
         const format = formData.get('format');
