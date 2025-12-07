@@ -63,3 +63,4 @@ UGTRACKS.md
 *.log
 processing.log
 UGTRACKS*.log
+RENDER_ENV_VARS.txt
