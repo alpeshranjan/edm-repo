@@ -71,19 +71,29 @@ def recognize():
     file.save(filepath)
     
     try:
+        # Check API availability first
+        acrcloud = ACRCloudRecognizer()
+        audd = AuddRecognizer()
+        
+        if not acrcloud.is_available() and not audd.is_available():
+            return jsonify({
+                'error': 'No recognition APIs available. Please configure API keys in environment variables.',
+                'acrcloud_configured': acrcloud.is_available(),
+                'audd_configured': audd.is_available()
+            }), 500
+        
         # Process the file
         processor = AudioProcessor(
             segment_length=segment_length,
             segment_overlap=segment_overlap
         )
         
-        acrcloud = ACRCloudRecognizer()
-        audd = AuddRecognizer()
-        
         # Get segments
         segments = processor.segment_audio(filepath)
         all_tracks = []
         temp_files = []
+        
+        print(f"Processing {len(segments)} segments...")
         
         # Process each segment
         for start_time, end_time in segments:
@@ -114,7 +124,11 @@ def recognize():
                     all_tracks.append(track)
                     
             except Exception as e:
-                print(f"Error processing segment {start_time}-{end_time}: {e}")
+                error_msg = str(e)
+                print(f"Error processing segment {start_time}-{end_time}: {error_msg}")
+                # Log to response for debugging
+                import traceback
+                traceback.print_exc()
         
         # Clean up temp files
         for temp_file in temp_files:
@@ -132,16 +146,27 @@ def recognize():
             return jsonify({
                 'success': True,
                 'tracks': unique_tracks,
-                'count': len(unique_tracks)
+                'count': len(unique_tracks),
+                'segments_processed': len(segments),
+                'api_status': {
+                    'acrcloud': acrcloud.is_available(),
+                    'audd': audd.is_available()
+                }
             })
         else:
             output_text = format_output(unique_tracks, format_type)
+            if len(unique_tracks) == 0:
+                output_text += f"\n\nNote: No tracks found. Processed {len(segments)} segments."
             return output_text, 200, {'Content-Type': 'text/plain; charset=utf-8'}
             
     except Exception as e:
+        error_msg = str(e)
+        error_traceback = traceback.format_exc()
+        print(f"ERROR: {error_msg}")
+        print(error_traceback)
         return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc() if app.debug else None
+            'error': error_msg,
+            'traceback': error_traceback if app.debug else 'Enable debug mode for details'
         }), 500
     
     finally:
@@ -158,5 +183,7 @@ if __name__ == '__main__':
         print("Warning: API keys not configured. Some features may not work.")
         print("Errors:", errors)
     
+    # Enable debug in production for better error messages (can disable later)
+    app.config['DEBUG'] = True
     app.run(debug=True, host='0.0.0.0', port=5000)
 

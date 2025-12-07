@@ -22,16 +22,20 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         });
         
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed');
+            const error = await response.json().catch(() => ({error: 'Unknown error'}));
+            throw new Error(error.error || error.message || 'Failed');
         }
         
         const format = formData.get('format');
         const data = format === 'json' ? await response.json() : await response.text();
         
-        results.textContent = format === 'json' ? JSON.stringify(data, null, 2) : data;
+        if (format === 'json' && data.count === 0) {
+            results.textContent = JSON.stringify(data, null, 2) + '\n\n⚠️ No tracks found. Check API keys or try a different file.';
+        } else {
+            results.textContent = format === 'json' ? JSON.stringify(data, null, 2) : data;
+        }
         results.style.display = 'block';
-        status.textContent = 'Done';
+        status.textContent = format === 'json' && data.count !== undefined ? `Done - Found ${data.count} tracks` : 'Done';
         
     } catch (error) {
         status.textContent = 'Error: ' + error.message;
