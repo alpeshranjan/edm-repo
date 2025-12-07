@@ -1,5 +1,18 @@
 # Deployment Guide
 
+## ⚠️ IMPORTANT: Install FFmpeg Buildpack First!
+
+**Before deploying, you MUST add the FFmpeg buildpack in Render settings:**
+
+1. Go to Render Dashboard → Your service → Settings
+2. Find "Buildpacks" section
+3. Add: `https://github.com/jonathanong/heroku-buildpack-ffmpeg-latest`
+4. Save and redeploy
+
+**See `FFMPEG_SETUP.md` for detailed instructions.**
+
+Without FFmpeg, the app will crash with memory errors!
+
 ## Quick Deploy to Render (Recommended)
 
 1. **Push your code to GitHub** (already done: https://github.com/alpeshranjan/edm-repo)
