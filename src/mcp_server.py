@@ -140,8 +140,8 @@ def identify_tracks(
         # Format output
         output_lines = ["## Identified Tracks"]
         for t in unique_tracks:
-            output_lines.append(f"- **{t.artist}** - {t.title} ({t.start_time} - {t.end_time}) [Confidence: {t.confidence:.2f}]")
-            
+            output_lines.append(f"- **{t['artist']}** - {t['title']} ({t['start_time']} - {t['end_time']}) [Confidence: {t['confidence']:.2f}]")
+
         return "\n".join(output_lines)
         
     except Exception as e:
